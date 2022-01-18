@@ -75,7 +75,7 @@ spec:
       volumes:
         - name: nginx-default-config
           configMap:
-            name: nginx-configmap
+            name: {{ include "nginx-chart.fullname" . }}
             items:
               - key: default.conf
                 path: default.conf
