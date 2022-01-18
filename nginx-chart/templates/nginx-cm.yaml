@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-configmap
+  labels:
+    {{- include "nginx-chart.labels" . | nindent 4 }}
+data:
+  default.conf: |-
+      server {
+          root /var/www/webservice;
+
+          error_log /var/log/nginx/error.log info;
+
+          location /nginx-ping {
+              access_log off;
+
+              if ($remote_addr = 127.0.0.1) {
+                  add_header Content-Type text/plain;
+                  return 200 'pong';
+              }
+          }
+          client_body_buffer_size 10M;
+          client_max_body_size 10m;
+
+          location / {
+              try_files $uri /index.php?route=$uri&$args;
+          }
+
+          location ~ ^/index\.php$ {
+              fastcgi_pass webservice-php-fpm:9000;
+              include fastcgi_params;
+              fastcgi_param SCRIPT_FILENAME $document_root/index.php;
+              fastcgi_param SCRIPT_NAME /index.php;
+
+              # 64 * 4k -> 256k; With 100 req/s -> 256Mb / s
+              fastcgi_buffers 64 4k;
+              # Sets the number and size of the buffers used for reading a response from the FastCGI server, for a single connection.
+              # By default, the buffer size is equal to one memory page. This is either 4K or 8K, depending on a platform.
+
+              fastcgi_connect_timeout 260s;
+              # Defines a timeout for establishing a connection with a FastCGI server. It should be noted that this timeout cannot usually exceed 75 seconds.
+
+              # Has to be longer than php fpm "request_terminate_timeout" value. So nginx don't give up before php does.
+              fastcgi_read_timeout 264s;
+              # Defines a timeout for reading a response from the FastCGI server.
+              # The timeout is set only between two successive read operations, not for the transmission of the whole response.
+              # If the FastCGI server does not transmit anything within this time, the connection is closed.
+
+              internal;
+          }
+
+          location ~ \.php$ {
+              return 404;
+          }
+      }
